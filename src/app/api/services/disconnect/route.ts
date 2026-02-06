@@ -24,24 +24,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Service not found' }, { status: 404 });
     }
 
-    // 2. Resolve any active incidents first
-    const { data: activeIncidents } = await supabase
-      .from('incidents')
-      .select('id')
-      .eq('service_id', serviceId)
-      .eq('status', 'active');
+    // 2. Delete ALL incidents for this service to ensure clean slate
+    // This ensures dashboard returns to 'Connect' screen (incidents.length === 0)
+    const { error: deleteIncidentsError } = await supabase.from('incidents').delete().eq('service_id', serviceId);
 
-    if (activeIncidents && activeIncidents.length > 0) {
-      for (const incident of activeIncidents) {
-        await supabase
-          .from('incidents')
-          .update({
-            status: 'resolved',
-            resolved_at: new Date().toISOString(),
-            resolution_notes: 'Service disconnected',
-          })
-          .eq('id', incident.id);
-      }
+    if (deleteIncidentsError) {
+      console.error('Failed to clear incidents:', deleteIncidentsError);
+      // We continue to delete service anyway
     }
 
     // 3. Delete the service (cascade will handle related data)

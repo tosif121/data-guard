@@ -58,7 +58,7 @@ export async function getIncidents() {
     .order('started_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching incidents:', error);
+    console.error('Error fetching incidents:', JSON.stringify(error, null, 2));
     return [];
   }
   // Flatten service name if needed, or handle in UI

@@ -1,3 +1,4 @@
+import { Header } from '@/components/Header';
 import { Providers } from '@/components/providers';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';

@@ -1,6 +1,12 @@
 // --- Types ---
 
-export type IncidentType = 'API_FAILURE' | 'DATABASE_SLOW' | 'TRAFFIC_SPIKE' | 'SECURITY_BREACH' | 'UNKNOWN';
+export type IncidentType =
+  | 'API_FAILURE'
+  | 'DATABASE_SLOW'
+  | 'TRAFFIC_SPIKE'
+  | 'SECURITY_BREACH'
+  | 'MONITORING'
+  | 'UNKNOWN';
 
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 

@@ -10,12 +10,11 @@ import type { TamboComponent } from '@tambo-ai/react';
 import { TamboTool } from '@tambo-ai/react';
 import { z } from 'zod';
 
-import { ActionButton } from '@/components/warroom/ActionButton';
-import { ErrorGraph } from '@/components/warroom/ErrorGraph';
-import { IncidentTimeline } from '@/components/warroom/IncidentTimeline';
-import { LogStream } from '@/components/warroom/LogStream';
-import { ServiceHealth } from '@/components/warroom/ServiceHealth';
-import { SlackDraft } from '@/components/warroom/SlackDraft';
+import { ActionButton } from '@/components/ActionButton';
+import { ErrorGraph } from '@/components/ErrorGraph';
+import { IncidentTimeline } from '@/components/IncidentTimeline';
+import { LogStream } from '@/components/LogStream';
+import { SlackDraft } from '@/components/SlackDraft';
 
 /**
  * tools
@@ -147,24 +146,6 @@ export const components: TamboComponent[] = [
     propsSchema: z.object({
       incidentId: z.string().optional(),
       events: z.array(z.any()).optional(),
-    }),
-  },
-  {
-    name: 'ServiceHealth',
-    description: 'Shows overall system health status.',
-    component: ServiceHealth,
-    propsSchema: z.object({
-      services: z
-        .array(
-          z.object({
-            name: z.string(),
-            status: z.enum(['operational', 'degraded', 'outage']),
-            latency: z.string(),
-            errorRate: z.string(),
-            uptime: z.string().optional(),
-          }),
-        )
-        .optional(),
     }),
   },
 ];

@@ -2,8 +2,10 @@
 
 import { useTambo } from '@tambo-ai/react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { reliableFetch } from '@/lib/api';
 import { AlertTriangle, CheckCircle, Clock, Loader2, Play, RefreshCw, Server, ShieldAlert, Zap } from 'lucide-react';
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 
 // --- Metadata Mapping ---
 const ACTION_METADATA: Record<
@@ -46,17 +48,32 @@ const ACTION_METADATA: Record<
   },
 };
 
-function RiskButton({ actionKey }: { actionKey: string }) {
+function RiskButton({
+  actionKey,
+  labelOverride,
+  descriptionOverride,
+}: {
+  actionKey: string;
+  labelOverride?: string;
+  descriptionOverride?: string;
+}) {
   const { sendThreadMessage } = useTambo();
   const [status, setStatus] = useState<'idle' | 'confirming' | 'loading' | 'success'>('idle');
 
-  const meta = ACTION_METADATA[actionKey] || {
+  const defaultMeta = ACTION_METADATA[actionKey] || {
     label: actionKey,
     description: 'Execute action',
     risk: 'Low',
     time: 'Unknown',
     icon: Play,
   };
+
+  const meta = {
+    ...defaultMeta,
+    label: labelOverride || defaultMeta.label,
+    description: descriptionOverride || defaultMeta.description,
+  };
+
   const Icon = meta.icon;
 
   const handleExecute = async () => {
@@ -64,26 +81,28 @@ function RiskButton({ actionKey }: { actionKey: string }) {
 
     // Execute real action if it's a rollback
     if (actionKey === 'rollback') {
-      try {
-        const response = await fetch('/api/incident/rollback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ serviceName: 'payment-service' }), // Hardcoded for demo/simplicity
-        });
-        const result = await response.json();
+      const { success, data, error } = await reliableFetch('/incident/rollback', {
+        method: 'POST',
+        data: { serviceName: 'payment-service', simulate: true },
+      });
 
-        if (!result.success) {
-          console.error(result.message);
-          // Fail gracefully visually, or just pretend for demo flow if no incident
-        }
-      } catch (e) {
-        console.error('Action failed', e);
+      if (success && data?.success) {
+        setStatus('success');
+        sendThreadMessage(`✅ Action Executed: ${meta.label}`);
+        setTimeout(() => setStatus('idle'), 3000);
+      } else {
+        setStatus('idle'); // Revert to idle on failure
+        console.error(`Action Failed: ${data?.error || error}`);
+        sendThreadMessage(`❌ Action Failed: ${meta.label} - ${data?.error || error}`);
+        toast.error(`Action Failed: ${data?.error || error}`);
       }
     } else {
       // Mock others
       await new Promise((resolve) => setTimeout(resolve, 2000));
+      setStatus('success');
+      sendThreadMessage(`✅ Action Executed: ${meta.label}`);
+      setTimeout(() => setStatus('idle'), 3000);
     }
-
     setStatus('success');
     sendThreadMessage(`✅ Action Executed: ${meta.label}`);
     setTimeout(() => setStatus('idle'), 3000);
@@ -215,7 +234,30 @@ function RiskButton({ actionKey }: { actionKey: string }) {
   );
 }
 
-export function ActionButton({ actions = ['rollback', 'monitor'] }: { actions?: string[] }) {
+interface ActionButtonProps {
+  actions?: string[];
+  title?: string;
+  description?: string;
+  actionId?: string;
+}
+
+export function ActionButton({ actions, title, description, actionId }: ActionButtonProps) {
+  // If specific action details propvided, render single button
+  if (actionId) {
+    return (
+      <div className="w-full bg-white/50 dark:bg-neutral-900/50 backdrop-blur-md border border-neutral-200 dark:border-white/10 rounded-2xl p-6 shadow-xl">
+        <h3 className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+          <Zap className="w-4 h-4" />
+          Recommended Action
+        </h3>
+        <RiskButton actionKey={actionId} labelOverride={title} descriptionOverride={description} />
+      </div>
+    );
+  }
+
+  // Fallback to list
+  const list = actions || ['rollback', 'monitor'];
+
   return (
     <div className="w-full bg-white/50 dark:bg-neutral-900/50 backdrop-blur-md border border-neutral-200 dark:border-white/10 rounded-2xl p-6 shadow-xl">
       <h3 className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-widest mb-6 flex items-center gap-2">
@@ -223,7 +265,7 @@ export function ActionButton({ actions = ['rollback', 'monitor'] }: { actions?: 
         Recommended Actions
       </h3>
       <div className="flex flex-col gap-4">
-        {actions.map((action) => (
+        {list.map((action) => (
           <RiskButton key={action} actionKey={action} />
         ))}
       </div>

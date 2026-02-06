@@ -31,7 +31,7 @@ A critical failure in the Payment Gateway (API 500 Errors) caused a 15% drop in 
 
 ## 3. Timeline
 - **Detected**: 14:02 UTC
-- **Diagnosis**: 14:03 UTC (WarRoom AI)
+- **Diagnosis**: 14:03 UTC (Data Guard AI)
 - **Action**: Rollback initiated at 14:04 UTC by SRE.
 - **Resolution**: 14:06 UTC.
 

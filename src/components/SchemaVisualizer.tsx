@@ -6,10 +6,12 @@ import { useState } from 'react';
 
 interface SchemaVisualizerProps {
   schema: any[];
+  skippedTables?: { name: string; reason: string }[];
   onConfirm: (selectedTables: string[]) => void;
+  onCancel: () => void;
 }
 
-export function SchemaVisualizer({ schema, onConfirm }: SchemaVisualizerProps) {
+export function SchemaVisualizer({ schema, skippedTables = [], onConfirm, onCancel }: SchemaVisualizerProps) {
   // Auto-select tables with recommendations
   const [selected, setSelected] = useState<string[]>(
     schema.filter((t) => t.recommendations.length > 0).map((t) => t.name),
@@ -29,10 +31,10 @@ export function SchemaVisualizer({ schema, onConfirm }: SchemaVisualizerProps) {
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-mono mb-4 border border-emerald-500/20">
           <Check className="w-3 h-3" /> Connection Successful
         </div>
-        <h2 className="text-3xl font-bold text-white mb-2">Database Schema Discovered</h2>
-        <p className="text-neutral-400">
-          We found <span className="text-white font-bold">{schema.length} tables</span>. Select the ones you want Data
-          Guard to monitor for incidents.
+        <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">Database Schema Discovered</h2>
+        <p className="text-neutral-500 dark:text-neutral-400">
+          We found <span className="text-neutral-900 dark:text-white font-bold">{schema.length} tables</span>. Select
+          the ones you want Data Guard to monitor for incidents.
         </p>
       </motion.div>
 
@@ -46,27 +48,29 @@ export function SchemaVisualizer({ schema, onConfirm }: SchemaVisualizerProps) {
             onClick={() => toggleSelection(table.name)}
             className={`relative p-5 rounded-xl border cursor-pointer transition-all group ${
               selected.includes(table.name)
-                ? 'bg-emerald-950/30 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
-                : 'bg-neutral-900/50 border-neutral-800 hover:border-neutral-700'
+                ? 'bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
+                : 'bg-white/50 dark:bg-neutral-900/50 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700'
             }`}
           >
             {/* Selection Indicator */}
             <div
               className={`absolute top-4 right-4 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-                selected.includes(table.name) ? 'bg-emerald-500 border-emerald-500' : 'border-neutral-600'
+                selected.includes(table.name)
+                  ? 'bg-emerald-500 border-emerald-500'
+                  : 'border-neutral-300 dark:border-neutral-600'
               }`}
             >
-              {selected.includes(table.name) && <Check className="w-3 h-3 text-black" />}
+              {selected.includes(table.name) && <Check className="w-3 h-3 text-white" />}
             </div>
 
             <div className="flex items-center gap-3 mb-4">
               <div
-                className={`p-2 rounded-lg ${selected.includes(table.name) ? 'bg-emerald-500/20 text-emerald-400' : 'bg-neutral-800 text-neutral-500'}`}
+                className={`p-2 rounded-lg ${selected.includes(table.name) ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'}`}
               >
                 <Table className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-white font-bold">{table.name}</h3>
+                <h3 className="text-neutral-900 dark:text-white font-bold">{table.name}</h3>
                 <span className="text-[10px] text-neutral-500 font-mono">{table.columns?.length || 0} columns</span>
               </div>
             </div>
@@ -91,13 +95,47 @@ export function SchemaVisualizer({ schema, onConfirm }: SchemaVisualizerProps) {
             )}
           </motion.div>
         ))}
+
+        {skippedTables &&
+          skippedTables.map((table) => (
+            <motion.div
+              key={table.name}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              className="relative p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 cursor-not-allowed opacity-60"
+            >
+              <div className="absolute top-4 right-4 text-neutral-400">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-neutral-200 dark:bg-neutral-800 text-neutral-400">
+                  <Table className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-neutral-500 dark:text-neutral-400 font-bold line-through">{table.name}</h3>
+                  <span className="text-[10px] text-red-500 font-mono italic">{table.reason}</span>
+                </div>
+              </div>
+
+              <div className="text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-800 p-2 rounded border border-neutral-200 dark:border-neutral-700">
+                GRANT SELECT ON {table.name} TO anon;
+              </div>
+            </motion.div>
+          ))}
       </div>
 
-      <div className="flex justify-center">
+      <div className="flex justify-center gap-4">
+        <button
+          onClick={onCancel}
+          className="bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-300 font-bold py-3 px-8 rounded-xl hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+        >
+          Cancel
+        </button>
         <button
           onClick={() => onConfirm(selected)}
           disabled={selected.length === 0}
-          className="bg-white text-black font-bold py-3 px-8 rounded-xl hover:bg-neutral-200 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-neutral-900 dark:bg-white text-white dark:text-black font-bold py-3 px-8 rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl"
         >
           Start Monitoring {selected.length} Tables <ArrowRight className="w-4 h-4" />
         </button>

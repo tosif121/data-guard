@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const apiSpec = await response.json();
     const tableNames = Object.keys(apiSpec.definitions || {});
 
-    console.log('✅ Found tables:', tableNames);
+    // console.log('Found tables:', tableNames);
 
     const schema = [];
     const skippedTables = [];
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
           recommendations: analyzeColumns(columns, tableName),
         });
       } catch (tableError: any) {
-        console.warn(`⚠️ Error processing ${tableName}:`, tableError.message);
+        // console.warn(`Error processing ${tableName}:`, tableError.message);
         skippedTables.push({ name: tableName, reason: tableError.message });
       }
     }
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       skippedTables: skippedTables.length > 0 ? skippedTables : undefined,
     });
   } catch (error: any) {
-    console.error('❌ API Error:', error);
+    console.error('API Error:', error);
     return NextResponse.json(
       {
         success: false,
@@ -119,28 +119,28 @@ function analyzeColumns(columns: any[], tableName: string) {
 
   // Check table name patterns
   if (tableName.includes('order') || tableName.includes('transaction')) {
-    recommendations.push('💰 Monitor transaction failures');
+    recommendations.push('Monitor transaction failures');
   }
   if (tableName.includes('error') || tableName.includes('log')) {
-    recommendations.push('📋 Stream error logs');
+    recommendations.push('Stream error logs');
   }
   if (tableName.includes('user') || tableName.includes('account')) {
-    recommendations.push('👥 Track user activity');
+    recommendations.push('Track user activity');
   }
 
   // Check column patterns
   if (names.includes('status')) {
-    recommendations.push('⚠️ Monitor failed records (status column detected)');
+    recommendations.push('Monitor failed records (status column detected)');
   }
   if (names.some((n) => n.includes('error') || n.includes('message'))) {
-    recommendations.push('🔍 Track error messages');
+    recommendations.push('Track error messages');
   }
   if (names.some((n) => n.includes('time') || n.includes('duration') || n.includes('latency'))) {
-    recommendations.push('⏱️ Monitor performance metrics');
+    recommendations.push('Monitor performance metrics');
   }
   if (names.includes('created_at') || names.includes('updated_at')) {
-    recommendations.push('📊 Track activity rate over time');
+    recommendations.push('Track activity rate over time');
   }
 
-  return recommendations.length > 0 ? recommendations : ['📦 General monitoring available'];
+  return recommendations.length > 0 ? recommendations : ['General monitoring available'];
 }
