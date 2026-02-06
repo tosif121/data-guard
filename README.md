@@ -205,10 +205,12 @@ data-guard/
 │   │   ├── ErrorGraph.tsx
 │   │   ├── LogStream.tsx
 │   │   ├── IncidentTimeline.tsx
+│   │   ├── SchemaVisualizer.tsx  # Onboarding
 │   │   └── ActionButton.tsx
 │   ├── lib/
 │   │   ├── hooks/
 │   │   │   └── useLiveMonitor.ts # Custom Poller
+│   │   ├── api.ts                # Axios Wrapper
 │   │   ├── incident-analyzer.ts  # Perplexity AI
 │   │   └── incident-detector.ts  # Incident Logic
 ├── supabase/
