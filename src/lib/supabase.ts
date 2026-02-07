@@ -93,10 +93,44 @@ export async function getSystemLogs(limit = 20) {
   })) as any[];
 }
 
-export async function createIncident(incident: Omit<Incident, 'id' | 'started_at'>) {
+// Extended type to allow service_name input from AI
+export async function createIncident(incident: Omit<Incident, 'id' | 'started_at'> & { service_name?: string }) {
   if (!supabase) throw new Error('Supabase client not initialized');
 
-  const { data, error } = await supabase.from('incidents').insert([incident]).select().single();
+  let serviceId = incident.service_id;
+
+  // Resolve service_name if provided and service_id is missing
+  if (!serviceId && incident.service_name) {
+    const { data: existing } = await supabase.from('services').select('id').eq('name', incident.service_name).single();
+
+    if (existing) {
+      serviceId = existing.id;
+    } else {
+      // Create simplified service if not found
+      const { data: newService, error: svcError } = await supabase
+        .from('services')
+        .insert([{ name: incident.service_name, status: 'unknown' }])
+        .select('id')
+        .single();
+
+      if (svcError) {
+        console.warn('Could not create service for incident', svcError);
+      } else {
+        serviceId = newService.id;
+      }
+    }
+  }
+
+  // Clean payload
+  const { service_name, ...cleanIncident } = incident;
+  const payload = {
+    ...cleanIncident,
+    service_id: serviceId, // Ensure mapped ID is used
+    status: cleanIncident.status || 'active', // Default validation
+    created_at: new Date().toISOString(), // Ensure timestamp
+  };
+
+  const { data, error } = await supabase.from('incidents').insert([payload]).select().single();
   if (error) throw error;
   return data as Incident;
 }
