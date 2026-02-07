@@ -20,13 +20,30 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid credentials or connection failed',
-        },
-        { status: 401 },
-      );
+      // If 401/403 on root, it might just be disabled openapi.
+      // We should verify credentials by trying a simple query.
+      const { error } = await supabase.from('_test_connection_probe').select('*').limit(1);
+
+      // If the error confirms we connected (e.g., table not found PGRST200 or successful empty), we are good.
+      // If error is 401/403 Invalid API Key, then fail.
+      const isAuthError =
+        error?.code === 'PGRST301' ||
+        error?.message?.includes('JWT') ||
+        error?.message?.includes('Invalid API key') ||
+        error?.code === '401' ||
+        error?.code === '403';
+
+      if (isAuthError) {
+        return NextResponse.json({ success: false, error: 'Invalid API Key' }, { status: 401 });
+      }
+
+      console.warn('Schema discovery failed (likely permissions), defaulting to manual entry mode.');
+      return NextResponse.json({
+        success: true,
+        message: 'Connected! (Schema hidden, manual entry required)',
+        schema: [],
+        skippedTables: [],
+      });
     }
 
     const apiSpec = await response.json();

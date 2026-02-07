@@ -46,16 +46,32 @@ const ACTION_METADATA: Record<
     time: 'Instant',
     icon: Clock,
   },
+  resolve: {
+    label: 'Resolve Incident',
+    description: 'Mark all active incidents as resolved.',
+    risk: 'Low',
+    time: 'Instant',
+    icon: CheckCircle,
+  },
+  clear_logs: {
+    label: 'Purge Error Logs',
+    description: 'Vacuum error_logs table (Reset Graph).',
+    risk: 'Medium',
+    time: '5s',
+    icon: Zap,
+  },
 };
 
 function RiskButton({
   actionKey,
   labelOverride,
   descriptionOverride,
+  onSuccess,
 }: {
   actionKey: string;
   labelOverride?: string;
   descriptionOverride?: string;
+  onSuccess?: (action: string) => void;
 }) {
   const { sendThreadMessage } = useTambo();
   const [status, setStatus] = useState<'idle' | 'confirming' | 'loading' | 'success'>('idle');
@@ -89,23 +105,36 @@ function RiskButton({
       if (success && data?.success) {
         setStatus('success');
         sendThreadMessage(`✅ Action Executed: ${meta.label}`);
+        if (onSuccess) onSuccess(actionKey); // Notify parent
         setTimeout(() => setStatus('idle'), 3000);
       } else {
-        setStatus('idle'); // Revert to idle on failure
-        console.error(`Action Failed: ${data?.error || error}`);
-        sendThreadMessage(`❌ Action Failed: ${meta.label} - ${data?.error || error}`);
-        toast.error(`Action Failed: ${data?.error || error}`);
+        setStatus('idle');
+        toast.error(`Rollback Failed: ${data?.error || data?.message || error}`);
+      }
+    } else if (actionKey === 'resolve' || actionKey === 'clear_logs') {
+      const { success, data, error } = await reliableFetch('/incident/remediate', {
+        method: 'POST',
+        data: { action: actionKey },
+      });
+
+      if (success && data?.success) {
+        setStatus('success');
+        sendThreadMessage(`✅ Action Executed: ${meta.label}`);
+        toast.success(data.message);
+        if (onSuccess) onSuccess(actionKey); // Notify parent
+        setTimeout(() => setStatus('idle'), 3000);
+      } else {
+        setStatus('idle');
+        toast.error(`Action Failed: ${data?.error || data?.message || error}`);
       }
     } else {
       // Mock others
       await new Promise((resolve) => setTimeout(resolve, 2000));
       setStatus('success');
       sendThreadMessage(`✅ Action Executed: ${meta.label}`);
+      if (onSuccess) onSuccess(actionKey); // Notify parent
       setTimeout(() => setStatus('idle'), 3000);
     }
-    setStatus('success');
-    sendThreadMessage(`✅ Action Executed: ${meta.label}`);
-    setTimeout(() => setStatus('idle'), 3000);
   };
 
   const riskStyles =
@@ -210,13 +239,13 @@ function RiskButton({
                 <div className="flex gap-4">
                   <button
                     onClick={() => setStatus('idle')}
-                    className="flex-1 py-4 rounded-xl font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors"
+                    className="flex-1 py-3 text-sm rounded-xl font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleExecute}
-                    className={`flex-1 py-4 rounded-xl font-bold shadow-lg transition-transform active:scale-95 ${
+                    className={`flex-1 py-3 text-sm rounded-xl font-bold shadow-lg transition-transform active:scale-95 ${
                       meta.risk === 'High'
                         ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
                         : 'bg-neutral-900 dark:bg-white text-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200'
@@ -239,9 +268,10 @@ interface ActionButtonProps {
   title?: string;
   description?: string;
   actionId?: string;
+  onSuccess?: (action: string) => void;
 }
 
-export function ActionButton({ actions, title, description, actionId }: ActionButtonProps) {
+export function ActionButton({ actions, title, description, actionId, onSuccess }: ActionButtonProps) {
   // If specific action details propvided, render single button
   if (actionId) {
     return (
@@ -250,7 +280,12 @@ export function ActionButton({ actions, title, description, actionId }: ActionBu
           <Zap className="w-4 h-4" />
           Recommended Action
         </h3>
-        <RiskButton actionKey={actionId} labelOverride={title} descriptionOverride={description} />
+        <RiskButton
+          actionKey={actionId}
+          labelOverride={title}
+          descriptionOverride={description}
+          onSuccess={onSuccess}
+        />
       </div>
     );
   }
@@ -266,7 +301,7 @@ export function ActionButton({ actions, title, description, actionId }: ActionBu
       </h3>
       <div className="flex flex-col gap-4">
         {list.map((action) => (
-          <RiskButton key={action} actionKey={action} />
+          <RiskButton key={action} actionKey={action} onSuccess={onSuccess} />
         ))}
       </div>
     </div>

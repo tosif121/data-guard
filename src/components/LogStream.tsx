@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { AnimatePresence, motion } from "framer-motion";
-import { Terminal, Wifi } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from 'framer-motion';
+import { Terminal, Wifi } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 type LogEntry = {
   id: string;
   timestamp: string;
-  level: "ERROR" | "WARN" | "INFO";
+  level: 'ERROR' | 'WARN' | 'INFO';
   service: string;
   message: string;
 };
@@ -16,12 +16,24 @@ export function LogStream({
   logs: initialLogs = [],
   autoScroll = true,
   serviceFilter,
+  externalLogs = [],
 }: {
   logs?: LogEntry[];
   autoScroll?: boolean;
   serviceFilter?: string;
+  externalLogs?: LogEntry[];
 }) {
   const [logs, setLogs] = useState<LogEntry[]>(initialLogs);
+
+  // Sync external logs
+  useEffect(() => {
+    if (externalLogs.length > 0) {
+      setLogs((prev) => {
+        const newLogs = [...prev, ...externalLogs].filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
+        return newLogs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).slice(-50);
+      });
+    }
+  }, [externalLogs]);
 
   // Data Fetching
   useEffect(() => {
@@ -33,36 +45,60 @@ export function LogStream({
 
     // Otherwise, fetch from Supabase if we have a service filter (or just get recent)
     const fetchLogs = async () => {
-      const { getSystemLogs } = await import("@/lib/supabase"); // Dynamic import to avoid server-side issues if any
-      // We can filter by service if needed, but for now getSystemLogs returns all recent
-      // TODO: Add service filter to getSystemLogs in supabase.ts if strict filtering needed
-      const realLogs = await getSystemLogs(25);
+      try {
+        const { getSystemLogs } = await import('@/lib/supabase');
+        const realLogs = await getSystemLogs(25);
 
-      if (realLogs && realLogs.length > 0) {
-        // Client-side filter if prop provided
-        const filtered = serviceFilter
-          ? realLogs.filter((l: any) =>
-              l.service?.toLowerCase().includes(serviceFilter.toLowerCase()),
-            )
-          : realLogs;
+        if (realLogs && realLogs.length > 0) {
+          const filtered = serviceFilter
+            ? realLogs.filter((l: any) => l.service?.toLowerCase().includes(serviceFilter.toLowerCase()))
+            : realLogs;
 
-        setLogs(
-          filtered.map((l: any) => ({
+          const mappedLogs = filtered.map((l: any) => ({
             id: l.id,
             timestamp: new Date(l.created_at).toLocaleTimeString(),
-            level: l.severity.toUpperCase() as "ERROR" | "WARN" | "INFO", // Ensure upper case for UI
-            service: l.service || "System",
+            level: l.severity.toUpperCase() as 'ERROR' | 'WARN' | 'INFO',
+            service: l.service || 'System',
             message: l.message,
-          })),
-        );
+          }));
+
+          setLogs((prev) => {
+            // Merge and de-dupe
+            const newLogs = [...prev, ...mappedLogs].filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
+            return newLogs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+          });
+        }
+      } catch (e) {
+        console.error('Log fetch failed', e);
       }
     };
 
     fetchLogs();
-
-    // Set up polling for "live" feel
     const interval = setInterval(fetchLogs, 5000);
-    return () => clearInterval(interval);
+
+    // Heartbeat / Idle Animation
+    const heartbeatParams = ['Checking latency...', 'Verifying integrity...', 'Syncing nodes...', 'Buffer flush...'];
+    const heartbeat = setInterval(() => {
+      setLogs((prev) => {
+        if (prev.length > 0 && new Date().getTime() - new Date(prev[prev.length - 1].timestamp).getTime() < 5000)
+          return prev;
+
+        // Add fake log if idle
+        const idleLog: LogEntry = {
+          id: `sys-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'INFO',
+          service: 'System',
+          message: heartbeatParams[Math.floor(Math.random() * heartbeatParams.length)],
+        };
+        return [...prev, idleLog].slice(-50); // Keep last 50
+      });
+    }, 8000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(heartbeat);
+    };
   }, [initialLogs, serviceFilter]);
 
   return (
@@ -78,9 +114,7 @@ export function LogStream({
           <div className="h-4 w-px bg-white/10 mx-1" />
           <div className="flex items-center gap-2 text-neutral-400">
             <Terminal className="w-3.5 h-3.5" />
-            <span className="text-xs font-medium tracking-widest opacity-80">
-              TERMINAL_OUTPUT
-            </span>
+            <span className="text-xs font-medium tracking-widest opacity-80">TERMINAL_OUTPUT</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -89,9 +123,7 @@ export function LogStream({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
             </div>
-            <span className="text-[10px] text-emerald-500 font-bold tracking-wider">
-              LIVE
-            </span>
+            <span className="text-[10px] text-emerald-500 font-bold tracking-wider">LIVE</span>
           </div>
         </div>
       </div>
@@ -107,32 +139,24 @@ export function LogStream({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
               className={`flex items-baseline gap-3 text-[11px] leading-relaxed group/line ${
-                log.level === "ERROR"
-                  ? "text-red-400 bg-red-500/5 -mx-4 px-4 py-0.5 border-l-2 border-red-500"
-                  : log.level === "WARN"
-                    ? "text-amber-400"
-                    : "text-neutral-400"
+                log.level === 'ERROR'
+                  ? 'text-red-400 bg-red-500/5 -mx-4 px-4 py-0.5 border-l-2 border-red-500'
+                  : log.level === 'WARN'
+                    ? 'text-amber-400'
+                    : 'text-neutral-400'
               }`}
             >
-              <span className="shrink-0 opacity-40 select-none w-16">
-                {log.timestamp}
-              </span>
+              <span className="shrink-0 opacity-40 select-none w-16">{log.timestamp}</span>
 
               <span
                 className={`shrink-0 font-bold w-12 ${
-                  log.level === "ERROR"
-                    ? "text-red-500"
-                    : log.level === "WARN"
-                      ? "text-amber-500"
-                      : "text-emerald-500"
+                  log.level === 'ERROR' ? 'text-red-500' : log.level === 'WARN' ? 'text-amber-500' : 'text-emerald-500'
                 }`}
               >
                 [{log.level}]
               </span>
 
-              <span className="shrink-0 text-white/60 w-24 truncate">
-                {log.service}:
-              </span>
+              <span className="shrink-0 text-white/60 w-24 truncate">{log.service}:</span>
 
               <span className="break-all opacity-80 group-hover/line:opacity-100 transition-opacity text-neutral-300">
                 {log.message}
@@ -144,9 +168,7 @@ export function LogStream({
         {logs.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-neutral-700 gap-2">
             <Wifi className="w-8 h-8 opacity-20" />
-            <p className="text-xs uppercase tracking-widest opacity-50">
-              Signal Acquired... Waiting for Data
-            </p>
+            <p className="text-xs uppercase tracking-widest opacity-50">Signal Acquired... Waiting for Data</p>
           </div>
         )}
 

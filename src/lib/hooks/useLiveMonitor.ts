@@ -55,6 +55,8 @@ export function useLiveMonitor(initialServices: any[], intervalMs: number = 3000
               latency = data.latency;
               isMonitored = true;
               isDb = true;
+              // Persist metrics
+              s.metrics = data.metrics;
             }
           }
 
@@ -81,9 +83,15 @@ export function useLiveMonitor(initialServices: any[], intervalMs: number = 3000
       const monitoredDb = servicesWithHealth.find((s: any) => s.isDb);
       if (monitoredDb) {
         setMetricHistory((prev) => {
+          // Use Real Data if available, fallback to simulation only if critical
+          const realErrors =
+            monitoredDb.status === 'outage'
+              ? 50
+              : (monitoredDb.metrics?.failedTransactions || 0) + (monitoredDb.metrics?.recentErrors || 0);
+
           const newPoint = {
             timestamp: new Date().toLocaleTimeString(),
-            errorCount: monitoredDb.status !== 'operational' ? 50 : Math.floor(monitoredDb._rawLatency / 10), // Fake error count based on latency for demo visual
+            errorCount: realErrors,
             latency: monitoredDb._rawLatency,
           };
           // Keep last 20 points

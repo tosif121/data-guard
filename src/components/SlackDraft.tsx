@@ -14,9 +14,11 @@ const CHANNELS = [
 export function SlackDraft({
   channel: initialChannel = '#new-channel',
   draftText = '🚨 *INCIDENT DECLARED*\n\n*Service:* payment-gateway\n*Severity:* SEV-1\n*Status:* Investigating\n\n_Team is looking into 500 errors on checkout._',
+  onSuccess,
 }: {
   channel?: string;
   draftText?: string;
+  onSuccess?: () => void;
 }) {
   const { sendThreadMessage } = useTambo();
   const [text, setText] = useState(draftText);
@@ -42,6 +44,7 @@ export function SlackDraft({
 
     if (success) {
       sendThreadMessage(`✅ Posted to Slack ${selectedChannel}`);
+      if (onSuccess) onSuccess();
       toast.custom(
         (t) => (
           <div

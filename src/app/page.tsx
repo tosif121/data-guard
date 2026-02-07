@@ -38,6 +38,20 @@ export default function DataGuardDashboard() {
   const [input, setInput] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
+  const [externalLogs, setExternalLogs] = useState<any[]>([]);
+
+  const addExternalLog = (message: string, level: 'INFO' | 'WARN' | 'ERROR' = 'INFO') => {
+    setExternalLogs((prev) => [
+      ...prev,
+      {
+        id: `ext-${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString(),
+        level,
+        service: 'System',
+        message,
+      },
+    ]);
+  };
 
   // DB Sync State
   const [initialLoading, setInitialLoading] = useState(true);
@@ -140,6 +154,7 @@ export default function DataGuardDashboard() {
 
     if (!messageOverride) setInput('');
     setIsAnalyzing(true);
+    addExternalLog(`Analyzing user input: "${query}"`, 'INFO');
     sendThreadMessage(query);
 
     try {
@@ -147,6 +162,7 @@ export default function DataGuardDashboard() {
       // No manual state update - relying on poll/refresh
     } catch (err) {
       console.error('AI Analysis Failed', err);
+      addExternalLog('AI Analysis failed. Check console.', 'ERROR');
       sendThreadMessage('⚠️ Error analyzing input. Check console.');
     } finally {
       setIsAnalyzing(false);
@@ -154,6 +170,7 @@ export default function DataGuardDashboard() {
   };
 
   const handleActionComplete = async (action: string) => {
+    addExternalLog(`Executing remediation action: ${action.toUpperCase()}`, 'WARN');
     setEvents((prev) => [
       ...prev,
       {
@@ -167,8 +184,13 @@ export default function DataGuardDashboard() {
 
     if (action === 'rollback') {
       const res = await initiateRollback('payment-service');
-      if (res.success) sendThreadMessage('✅ Rollback initiated successfully.');
-      else sendThreadMessage(`❌ Rollback failed: ${res.message}`);
+      if (res.success) {
+        addExternalLog(`Rollback successful for service: payment-service`, 'INFO');
+        sendThreadMessage('✅ Rollback initiated successfully.');
+      } else {
+        addExternalLog(`Rollback failed: ${res.message}`, 'ERROR');
+        sendThreadMessage(`❌ Rollback failed: ${res.message}`);
+      }
     }
   };
 
@@ -341,21 +363,17 @@ export default function DataGuardDashboard() {
                     <ErrorGraph threshold={30} data={metricHistory} />
                   </motion.div>
                   <motion.div variants={itemVariants} className="h-full">
-                    <LogStream />
+                    <LogStream externalLogs={externalLogs} />
                   </motion.div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <motion.div variants={itemVariants}>
-                    <div onClick={() => handleActionComplete('rollback')}>
-                      <ActionButton
-                        title="Initiate Rollback"
-                        description="Revert to last stable version"
-                        actionId="rollback"
-                      />
-                    </div>
+                    <motion.div variants={itemVariants}>
+                      <ActionButton actions={['rollback', 'resolve', 'clear_logs']} onSuccess={handleActionComplete} />
+                    </motion.div>
                   </motion.div>
                   <motion.div variants={itemVariants}>
-                    <SlackDraft />
+                    <SlackDraft onSuccess={() => addExternalLog('Slack notification sent to channel.', 'INFO')} />
                   </motion.div>
                 </div>
               </div>
