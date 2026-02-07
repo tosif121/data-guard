@@ -13,6 +13,7 @@ import { ErrorGraph } from '@/components/ErrorGraph';
 import { IncidentTimeline } from '@/components/IncidentTimeline';
 import { LogStream } from '@/components/LogStream';
 import { SlackDraft } from '@/components/SlackDraft';
+import { QueryPerformanceWidget } from '@/components/QueryPerformanceWidget';
 
 // Server Actions
 import { getSystemState, handleUserMessage } from '@/app/actions';
@@ -366,6 +367,10 @@ export default function DataGuardDashboard() {
                     <LogStream externalLogs={externalLogs} />
                   </motion.div>
                 </div>
+                {/* Query Doctor Widget (Visible if incident is DB related or just generally available) */}
+                <motion.div variants={itemVariants}>
+                  <QueryPerformanceWidget />
+                </motion.div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <motion.div variants={itemVariants}>
                     <motion.div variants={itemVariants}>
@@ -373,7 +378,14 @@ export default function DataGuardDashboard() {
                     </motion.div>
                   </motion.div>
                   <motion.div variants={itemVariants}>
-                    <SlackDraft onSuccess={() => addExternalLog('Slack notification sent to channel.', 'INFO')} />
+                    <SlackDraft
+                      draftText={
+                        incident && incident.type !== 'MONITORING'
+                          ? `🚨 *INCIDENT DETECTED*\n\n*Service:* ${incident.service}\n*Severity:* ${incident.severity}\n*Status:* ${incident.type}\n\n_Analysis:_ ${incident.widgets.map((w) => w.reason).join(', ')}`
+                          : ''
+                      }
+                      onSuccess={() => addExternalLog('Slack notification sent to channel.', 'INFO')}
+                    />
                   </motion.div>
                 </div>
               </div>

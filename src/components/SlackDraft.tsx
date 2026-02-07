@@ -2,7 +2,7 @@
 
 import { useTambo } from '@tambo-ai/react';
 import { Check, Copy, Hash, MessageSquare, Send, User, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
 const CHANNELS = [
@@ -13,7 +13,7 @@ const CHANNELS = [
 
 export function SlackDraft({
   channel: initialChannel = '#new-channel',
-  draftText = '🚨 *INCIDENT DECLARED*\n\n*Service:* payment-gateway\n*Severity:* SEV-1\n*Status:* Investigating\n\n_Team is looking into 500 errors on checkout._',
+  draftText = '',
   onSuccess,
 }: {
   channel?: string;
@@ -26,6 +26,11 @@ export function SlackDraft({
   const [sent, setSent] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState(initialChannel);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Sync text with prop changes (Live Updates)
+  useEffect(() => {
+    setText(draftText);
+  }, [draftText]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(text);
